@@ -1,0 +1,31 @@
+# --- Môi trường ảo Python ---
+# Tuyệt đối không đẩy môi trường ảo lên Git
+.venv/
+.venv311/
+
+# --- Cache của Python và VS Code ---
+__pycache__/
+*.pyc
+.vscode/
+tempCodeRunnerFile.py
+
+# --- DỮ LIỆU (QUAN TRỌNG NHẤT!) ---
+# KHÔNG đẩy 12,000 video gốc (hàng GB)
+videos/
+
+# KHÔNG đẩy hàng nghìn file keypoints đã xử lý
+Data_Keypoints/
+
+# (Các thư mục dữ liệu cũ nếu bạn còn dùng)
+Data_Videos/
+temp_downloads/
+
+# --- MÔ HÌNH ĐÃ HUẤN LUYỆN ---
+# Các file này là KẾT QUẢ của script, không phải code
+# Bạn của bạn sẽ tự chạy train_model.py để tạo ra chúng
+*.h5
+*.keras
+*.pkl
+
+# --- Hệ điều hành ---
+.DS_Store
