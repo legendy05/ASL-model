@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nhận diện Ký hiệu (MediaPipe)</title>
+    <!-- Tải Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 
+      BƯỚC 1: Tải thư viện MediaPipe Tasks Vision (chuyên dụng)
+    -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.js"></script>
+
+    <style>
+        /* Lật video (như gương) để khớp với cử chỉ của người dùng */
+        #webcam {
+            transform: scaleX(-1);
+            -webkit-transform: scaleX(-1);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white h-full flex items-center justify-center font-sans">
+
+    <div class="flex flex-col items-center p-8 bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full">
+        <h1 class="text-3xl font-bold mb-6 text-cyan-400">Nhận diện Ký hiệu (MediaPipe)</h1>
+        
+        <!-- Vùng hiển thị Webcam -->
+        <div class="relative w-full aspect-video rounded-xl overflow-hidden mb-6 border-4 border-gray-700">
+            <!-- 
+                Chúng ta sẽ hiển thị video trong một <video> element.
+                MediaPipe sẽ vẽ các landmark (điểm mốc) lên một <canvas> element.
+                Chúng ta đặt canvas LÊN TRÊN video.
+            -->
+            <video id="webcam" class="absolute top-0 left-0 w-full h-full object-cover" autoplay playsinline></video>
+            <canvas id="output_canvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+        </div>
+
+        <!-- Vùng kết quả -->
+        <div class="w-full text-center">
+            <p id="status" class="text-lg text-yellow-400 mb-4">Đang tải mô hình...</p>
+            <div class="bg-gray-900 rounded-xl p-6">
+                <p class="text-lg text-gray-400 mb-2">Ký hiệu được nhận diện:</p>
+                <p id="result" class="text-6xl font-black text-cyan-300 transition-all duration-200" style="min-height: 80px;">...</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // BƯỚC 2: Import các thư viện cần thiết từ MediaPipe
+        import {
+            GestureRecognizer,
+            FilesetResolver,
+            DrawingUtils
+        } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.js";
+
+        // --- 1. Định nghĩa các hằng số và biến ---
+        const MODEL_URL = "./sign_language_recognizer_25-04-2023.task";
+        
+        const video = document.getElementById('webcam');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const statusEl = document.getElementById('status');
+        const resultEl = document.getElementById('result');
+
+        let gestureRecognizer;
+        let drawingUtils;
+        let lastVideoTime = -1;
+
+        // --- 2. Hàm chính: Tải mô hình và khởi động webcam ---
+        async function main() {
+            try {
+                // Tải các tài nguyên cho thư viện Vision (file .wasm)
+                const vision = await FilesetResolver.forVisionTasks(
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+                );
+
+                // BƯỚC 3: Tạo và cấu hình GestureRecognizer
+                // Đây là lúc chúng ta "chỉ" cho nó file .task
+                gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: MODEL_URL, // Sử dụng đường dẫn cục bộ
+                        delegate: "GPU" // Dùng GPU để tăng tốc
+                    },
+                    runningMode: "VIDEO", // Chế độ video
+                    numHands: 1 // Chỉ nhận diện 1 tay
+                });
+
+                drawingUtils = new DrawingUtils(canvasCtx);
+                statusEl.innerText = "Mô hình đã tải. Đang bật webcam...";
+
+                // Khởi động webcam
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 1280, height: 720 }
+                });
+                video.srcObject = stream;
+
+                video.addEventListener("loadeddata", () => {
+                    // Cài đặt kích thước canvas bằng kích thước video
+                    canvasElement.width = video.videoWidth;
+                    canvasElement.height = video.videoHeight;
+                    statusEl.innerText = "Sẵn sàng!";
+                    
+                    // Bắt đầu vòng lặp dự đoán
+                    predictWebcam();
+                });
+
+            } catch (err) {
+                console.error("Lỗi tải mô hình hoặc webcam: ", err);
+                statusEl.innerText = "Lỗi! Không thể tải mô hình hoặc webcam.";
+            }
+        }
+
+        // --- 4. Hàm dự đoán (Chạy liên tục) ---
+        async function predictWebcam() {
+            const nowInMs = Date.now();
+            
+            // Chỉ chạy nếu video đã sẵn sàng và thời gian đã thay đổi
+            if (video.currentTime !== lastVideoTime) {
+                lastVideoTime = video.currentTime;
+                
+                // BƯỚC 4: Gửi khung hình video vào GestureRecognizer
+                // MediaPipe tự động làm tất cả (tiền xử lý, chạy model)
+                const results = gestureRecognizer.recognizeForVideo(video, nowInMs);
+
+                // Xóa canvas
+                canvasCtx.save();
+                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+                // Vẽ các điểm mốc (landmarks) của tay
+                if (results.landmarks) {
+                    for (const landmarks of results.landmarks) {
+                        drawingUtils.drawLandmarks(landmarks, {
+                            color: "#FF0000", // Màu đỏ cho điểm mốc
+                            lineWidth: 2
+                        });
+                        drawingUtils.drawConnectors(landmarks, GestureRecognizer.HAND_CONNECTIONS, {
+                            color: "#00FF00", // Màu xanh cho đường nối
+                            lineWidth: 3
+                        });
+                    }
+                }
+                canvasCtx.restore();
+
+                // BƯỚC 5: Hiển thị kết quả
+                if (results.gestures && results.gestures.length > 0) {
+                    // Lấy cử chỉ có điểm số cao nhất
+                    const categoryName = results.gestures[0][0].categoryName;
+                    const categoryScore = (results.gestures[0][0].score * 100).toFixed(2);
+                    
+                    // Hiển thị tên cử chỉ (ví dụ: "A", "B", "Hello")
+                    resultEl.innerText = `${categoryName} (${categoryScore}%)`;
+                } else {
+                    resultEl.innerText = "...";
+                }
+            }
+            
+            // Gọi lại hàm này cho khung hình tiếp theo
+            requestAnimationFrame(predictWebcam);
+        }
+
+        // --- 5. Chạy hàm chính ---
+        main();
+    </script>
+</body>
+</html>

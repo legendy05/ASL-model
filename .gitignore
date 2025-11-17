@@ -1,0 +1,29 @@
+# ==== MÔI TRƯỜNG ẢO PYTHON ====
+.venv/
+.venv311/
+env/
+venv/
+
+# ==== CACHE PYTHON & EDITOR ====
+__pycache__/
+*.pyc
+.vscode/
+tempCodeRunnerFile.py
+
+# ==== DỮ LIỆU NẶNG (KHÔNG ĐƯA LÊN GIT) ====
+
+# Keypoints đã xử lý
+Data_Keypoints/
+
+# File landmark train
+train landmark.zip
+train_landmark/
+
+
+# ==== FILE TẠM ====
+*.tmp
+*.log
+
+# ==== HỆ ĐIỀU HÀNH ====
+.DS_Store
+Thumbs.db
